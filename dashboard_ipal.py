@@ -9,29 +9,28 @@ import altair as alt
 st.set_page_config(page_title="Digital Logbook IPAL", layout="wide")
 
 st.title("🎛️ Digital Logbook & EWS IPAL")
-st.subheader("RSUD Tanjung Priok - Instalasi Kesehatan Lingkungan (Versi 4.0 - Real-Time SCADA)")
+st.subheader("RSUD Tanjung Priok - Instalasi Kesehatan Lingkungan (Versi 4.1 - Real-Time SCADA)")
 st.markdown("---")
 
 # ========================================== #
 # KONEKSI DATABASE (WEBHOOK & CSV PULL)
 # ========================================== #
-# 1. URL untuk MENGIRIM Data (Push)
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzS9HDRvge_k8AA6TWIla-m6D-RWUZXG-uMEuwsND78UYXxFzUMLQpzTK0XFjafa2Y/exec"
-
-# 2. URL untuk MENARIK Riwayat Data (Pull)
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTQ6T05NwCYzCYA9qgeYjt-gzPc73Ym8pY_IfNqJ3t_YpU4g7Tul-S_H-REz3tDmFldgP2_XiItcg6b/pub?output=csv"
 
-@st.cache_data(ttl=10) # Refresh penarikan data tiap 10 detik
+@st.cache_data(ttl=10) # Refresh data otomatis tiap 10 detik
 def ambil_data_riwayat():
     try:
         df = pd.read_csv(CSV_URL)
+        # Saringan Pintar: Buang semua baris kosong yang tidak punya Tanggal
+        df = df.dropna(subset=['Tanggal Inspeksi'])
         return df
     except Exception as e:
         return pd.DataFrame()
 
 df_history = ambil_data_riwayat()
 
-# Ekstraksi Data Riwayat Aktual (7 Data Terakhir)
+# Ekstraksi Data Riwayat Aktual
 riwayat_ph_aktual = []
 riwayat_do_aktual = []
 riwayat_klorin_aktual = []
@@ -39,11 +38,13 @@ tanggal_riwayat = []
 
 if not df_history.empty:
     try:
-        # Menarik data 7 baris terakhir dari Google Sheets
+        # Ambil 7 baris paling akhir
         df_last = df_history.tail(7)
-        riwayat_ph_aktual = pd.to_numeric(df_last['pH Efluen'], errors='coerce').dropna().tolist()
-        riwayat_do_aktual = pd.to_numeric(df_last['DO Aerasi (mg/L)'], errors='coerce').dropna().tolist()
-        riwayat_klorin_aktual = pd.to_numeric(df_last['Sisa Klorin (ppm)'], errors='coerce').dropna().tolist()
+        
+        # Ekstraksi tanpa dropna() tunggal agar panjang array PASTI sama rata
+        riwayat_ph_aktual = pd.to_numeric(df_last['pH Efluen'], errors='coerce').fillna(7.0).tolist()
+        riwayat_do_aktual = pd.to_numeric(df_last['DO Aerasi (mg/L)'], errors='coerce').fillna(2.0).tolist()
+        riwayat_klorin_aktual = pd.to_numeric(df_last['Sisa Klorin (ppm)'], errors='coerce').fillna(0.2).tolist()
         tanggal_riwayat = pd.to_datetime(df_last['Tanggal Inspeksi'], errors='coerce').dt.date.tolist()
     except:
         pass
@@ -98,7 +99,7 @@ if tombol_submit:
             jsondata = json.dumps(data_to_send).encode('utf-8')
             response = urllib.request.urlopen(req, jsondata)
             st.success(f"✅ Berhasil! Laporan atas nama {operator} telah tersimpan di Database!")
-            st.cache_data.clear() # Paksa sistem memuat ulang data terbaru setelah submit
+            st.cache_data.clear() # Paksa sistem memuat ulang data CSV terbaru setelah submit
         except Exception as e:
             st.error(f"⚠️ Gagal mengirim data. Error: {e}")
 
@@ -111,11 +112,14 @@ st.header("📈 Analitika Tren Parameter Utama")
 st.markdown("*Grafik menampilkan riwayat **Aktual dari Database** digabungkan dengan input Anda saat ini. Area hijau adalah Batas Aman.*")
 
 def buat_grafik(nilai_sekarang, riwayat_y, tgl_riwayat, judul, nama_y, min_aman, max_aman):
-    # Gabungkan riwayat aktual dengan data di layar saat ini
-    tgl_semua = tgl_riwayat + [tanggal]
-    nilai_semua = riwayat_y + [nilai_sekarang]
+    # Proteksi ganda: Pastikan tgl dan data ditarik dengan ukuran paling aman terkecil
+    min_len = min(len(tgl_riwayat), len(riwayat_y))
+    t_aman = tgl_riwayat[-min_len:] if min_len > 0 else []
+    y_aman = riwayat_y[-min_len:] if min_len > 0 else []
     
-    # Pencegahan error jika database baru berisi 1 baris
+    tgl_semua = t_aman + [tanggal]
+    nilai_semua = y_aman + [nilai_sekarang]
+    
     if len(tgl_semua) <= 1:
         tgl_semua = [tanggal - datetime.timedelta(days=1), tanggal]
         nilai_semua = [nilai_sekarang, nilai_sekarang]
