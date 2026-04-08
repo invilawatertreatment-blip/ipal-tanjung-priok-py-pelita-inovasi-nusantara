@@ -1,11 +1,13 @@
 import streamlit as st
 import datetime
+import urllib.request
+import json
 
 # Konfigurasi Halaman
 st.set_page_config(page_title="Digital Logbook IPAL", layout="wide")
 
 st.title("🎛️ Digital Logbook & EWS IPAL")
-st.subheader("RSUD Tanjung Priok - Instalasi Kesehatan Lingkungan (Versi 2.1)")
+st.subheader("RSUD Tanjung Priok - Instalasi Kesehatan Lingkungan (Versi 3.0 Final)")
 st.markdown("---")
 
 # ========================================== #
@@ -39,6 +41,9 @@ with col_ut2:
     sisa_klorin = st.number_input("Sisa Klorin Bebas (ppm)", min_value=0.0, max_value=5.0, value=0.2, step=0.1)
     keluhan_warga = st.number_input("Keluhan Warga (Jumlah)", min_value=0, value=0)
 
+# URL Webhook Google Sheets milik Anda
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx2R3umzNLcD8TmZjiXoUvpYcIWmB4rc6rI0TgzSbFbLoIM7svJ_8lrTryEWOQjtrbR/exec"
+
 # Tombol Submit 
 tombol_submit = st.button("💾 SUBMIT DATA LOGBOOK")
 
@@ -46,7 +51,32 @@ if tombol_submit:
     if operator == "":
         st.error("⚠️ Nama Operator wajib diisi sebelum Submit!")
     else:
-        st.success(f"Data milik {operator} siap dikirim! (Integrasi Database segera hadir)")
+        # Menyiapkan paket data untuk dikirim ke Google Sheets
+        data_to_send = {
+            "operator": operator,
+            "shift": shift,
+            "tanggal": tanggal.strftime("%Y-%m-%d"),
+            "waktu": waktu.strftime("%H:%M"),
+            "debit": debit,
+            "kekeruhan": kekeruhan,
+            "ph_inlet": ph_inlet,
+            "ph_effluent": ph_effluent,
+            "listrik": listrik,
+            "uptime_blower": uptime_blower,
+            "sisa_klorin": sisa_klorin,
+            "keluhan_warga": keluhan_warga
+        }
+        
+        # Proses Pengiriman Data
+        try:
+            req = urllib.request.Request(WEBHOOK_URL, method="POST")
+            req.add_header('Content-Type', 'application/json')
+            jsondata = json.dumps(data_to_send).encode('utf-8')
+            response = urllib.request.urlopen(req, jsondata)
+            
+            st.success(f"✅ Berhasil! Laporan atas nama {operator} telah tersimpan permanen di Google Sheets!")
+        except Exception as e:
+            st.error(f"⚠️ Gagal mengirim data. Error: {e}")
 
 st.markdown("---")
 
