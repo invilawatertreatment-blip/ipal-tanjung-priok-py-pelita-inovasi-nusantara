@@ -110,4 +110,44 @@ with col_g1:
 with col_g2:
     st.altair_chart(buat_grafik(do_aerasi, riwayat_do, "DO Aerasi (Rentang: 1.5 - 3.0)", "DO (mg/L)", 1.5, 3.0), use_container_width=True)
 with col_g3:
-    st.altair_chart(buat_grafik(sisa_klorin, riwayat_klorin, "Sisa Klorin (Rentang: 0.1 - 0.5)", "Klorin (ppm)", 0.1, 0
+    st.altair_chart(buat_grafik(sisa_klorin, riwayat_klorin, "Sisa Klorin (Rentang: 0.1 - 0.5)", "Klorin (ppm)", 0.1, 0.5), use_container_width=True)
+
+st.markdown("---")
+
+# ========================================== #
+# TAMPILAN UTAMA DASHBOARD (TRAFFIC LIGHT)
+# ========================================== #
+st.header("🚨 Panel Status Peringatan Dini (EWS)")
+
+# Logika Warna (Traffic Light)
+status_inlet = ("🟢 AMAN", "Limbah masuk stabil.") if 6.0 <= ph_inlet <= 8.0 else ("🔴 BAHAYA", "ALARM! pH Inlet Ekstrem!")
+status_ph_out = ("🟢 AMAN", "Sesuai baku mutu.") if 6.0 <= ph_effluent <= 8.0 else ("🔴 BAHAYA", "Melanggar baku mutu.")
+status_tss = ("🟢 AMAN", "Flok sehat.") if kekeruhan == "Bening Jernih" else ("🔴 BAHAYA", "Indikasi bakteri Wash-out.")
+
+if 1.5 <= do_aerasi <= 3.0: status_do = ("🟢 AMAN", "Oksigen ideal.")
+elif do_aerasi < 1.5: status_do = ("🔴 BAHAYA", "Oksigen DROP! Bakteri lemas.")
+else: status_do = ("🟡 WASPADA", "Over-aerasi. Boros Blower.")
+
+if 2000 <= mlss <= 4000: status_mlss = ("🟢 AMAN", "Bakteri optimal.")
+elif mlss < 2000: status_mlss = ("🔴 BAHAYA", "Populasi kurang.")
+else: status_mlss = ("🟡 WASPADA", "Lumpur padat (Butuh Desludging).")
+
+status_klorin = ("🟢 AMAN", "Patogen mati.") if 0.1 <= sisa_klorin <= 0.5 else ("🔴 BAHAYA", "Dosis tidak standar.")
+status_blower = ("🟢 AMAN", "Blower ON.") if uptime_blower == 24 else ("🔴 BAHAYA", "Blower Trip/Mati!")
+
+col_d1, col_d2, col_d3 = st.columns(3)
+with col_d1:
+    st.subheader("💧 Fisik & Kimia")
+    st.warning(f"**pH Inlet:** {ph_inlet} | {status_inlet[0]}\n\n*{status_inlet[1]}*")
+    st.info(f"**pH Effluent:** {ph_effluent} | {status_ph_out[0]}\n\n*{status_ph_out[1]}*")
+    st.info(f"**Kekeruhan:** {kekeruhan} | {status_tss[0]}")
+with col_d2:
+    st.subheader("🦠 Bioreaktor")
+    st.warning(f"**DO Aerasi:** {do_aerasi} | {status_do[0]}\n\n*{status_do[1]}*")
+    st.warning(f"**MLSS:** {mlss} | {status_mlss[0]}\n\n*{status_mlss[1]}*")
+    st.success(f"**Jam Blower:** {uptime_blower} Jam | {status_blower[0]}")
+with col_d3:
+    st.subheader("🏥 PPI & Sosial")
+    st.warning(f"**Klorin:** {sisa_klorin} ppm | {status_klorin[0]}")
+    if keluhan_warga == 0: st.success(f"**Komplain Bau:** {keluhan_warga} | 🟢 AMAN")
+    else: st.error(f"**Komplain Bau:** {keluhan_warga} | 🔴 BAHAYA")
